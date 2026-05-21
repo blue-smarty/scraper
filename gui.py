@@ -40,6 +40,12 @@ class ScraperApp(tk.Tk):
         self._log_queue: queue.Queue = queue.Queue()
         self._scrape_thread: threading.Thread | None = None
 
+        # Configure a single queue handler attached once for the lifetime of the app
+        self._queue_handler = _QueueHandler(self._log_queue)
+        self._queue_handler.setFormatter(
+            logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+        logging.getLogger().addHandler(self._queue_handler)
+
         self._build_ui()
         self._start_log_polling()
 
@@ -126,10 +132,6 @@ class ScraperApp(tk.Tk):
             controls, text="▶  Start Scraping", command=self._on_start)
         self._start_btn.pack(side="left", padx=(0, 6))
 
-        self._stop_btn = ttk.Button(
-            controls, text="⏹  Stop", command=self._on_stop, state="disabled")
-        self._stop_btn.pack(side="left")
-
         self._status_var = tk.StringVar(value="Ready")
         ttk.Label(controls, textvariable=self._status_var,
                   foreground="grey").pack(side="left", padx=12)
@@ -169,19 +171,10 @@ class ScraperApp(tk.Tk):
             self._append_log("ERROR: Min/Max price must be integers.", "ERROR")
             return
 
-        # Configure logging
+        # Configure logging level for this run
         level = logging.DEBUG if self._verbose.get() else logging.INFO
-        root_logger = logging.getLogger()
-        root_logger.setLevel(level)
-
-        # Attach queue handler (avoid duplicates on repeated runs)
-        for h in list(root_logger.handlers):
-            if isinstance(h, _QueueHandler):
-                root_logger.removeHandler(h)
-        handler = _QueueHandler(self._log_queue)
-        handler.setFormatter(
-            logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
-        root_logger.addHandler(handler)
+        logging.getLogger().setLevel(level)
+        self._queue_handler.setLevel(level)
 
         # Capture all parameters now (before thread starts)
         kwargs = dict(
@@ -195,19 +188,11 @@ class ScraperApp(tk.Tk):
         )
 
         self._start_btn.config(state="disabled")
-        self._stop_btn.config(state="normal")
         self._status_var.set("Running…")
-        self._stop_flag = False
 
         self._scrape_thread = threading.Thread(
             target=self._run_scraper, kwargs=kwargs, daemon=True)
         self._scrape_thread.start()
-
-    def _on_stop(self) -> None:
-        # The scraper has no cooperative stop; mark the flag and inform user
-        self._stop_flag = True
-        self._status_var.set("Stopping after current operation…")
-        self._append_log("Stop requested — will halt after the current download.", "WARNING")
 
     # ------------------------------------------------------------------
     # Scraper thread
@@ -235,11 +220,9 @@ class ScraperApp(tk.Tk):
                 if msg == "__DONE__":
                     self._status_var.set("Done ✓")
                     self._start_btn.config(state="normal")
-                    self._stop_btn.config(state="disabled")
                 elif msg == "__ERROR__":
                     self._status_var.set("Error ✗")
                     self._start_btn.config(state="normal")
-                    self._stop_btn.config(state="disabled")
                 else:
                     tag = "ERROR" if "[ERROR]" in msg else (
                           "WARNING" if "[WARNING]" in msg else (
