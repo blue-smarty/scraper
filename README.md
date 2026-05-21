@@ -26,6 +26,17 @@ pip install -r requirements.txt
 
 ## Usage
 
+### GUI (recommended)
+
+```bash
+python gui.py
+```
+
+A window will open where you can set all options and click **▶ Start Scraping**.
+No extra dependencies are required — the GUI uses Python's built-in `tkinter`.
+
+### Command line
+
 ```
 python scraper.py [options]
 ```
