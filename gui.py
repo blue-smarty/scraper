@@ -39,6 +39,7 @@ class ScraperApp(tk.Tk):
 
         self._log_queue: queue.Queue = queue.Queue()
         self._scrape_thread: threading.Thread | None = None
+        self._stop_event: threading.Event = threading.Event()
 
         # Configure a single queue handler attached once for the lifetime of the app
         self._queue_handler = _QueueHandler(self._log_queue)
@@ -139,6 +140,10 @@ class ScraperApp(tk.Tk):
             controls, text="▶  Start Scraping", command=self._on_start)
         self._start_btn.pack(side="left", padx=(0, 6))
 
+        self._stop_btn = ttk.Button(
+            controls, text="⏹  Stop", command=self._on_stop, state="disabled")
+        self._stop_btn.pack(side="left", padx=(0, 6))
+
         self._status_var = tk.StringVar(value="Ready")
         ttk.Label(controls, textvariable=self._status_var,
                   foreground="grey").pack(side="left", padx=12)
@@ -196,20 +201,33 @@ class ScraperApp(tk.Tk):
         )
 
         self._start_btn.config(state="disabled")
+        self._stop_btn.config(state="normal")
         self._status_var.set("Running…")
+
+        self._stop_event = threading.Event()
+        kwargs["stop_event"] = self._stop_event
 
         self._scrape_thread = threading.Thread(
             target=self._run_scraper, kwargs=kwargs, daemon=True)
         self._scrape_thread.start()
+
+    def _on_stop(self) -> None:
+        self._stop_event.set()
+        self._stop_btn.config(state="disabled")
+        self._status_var.set("Stopping…")
 
     # ------------------------------------------------------------------
     # Scraper thread
     # ------------------------------------------------------------------
 
     def _run_scraper(self, **kwargs) -> None:
+        stop_event = kwargs.get("stop_event")
         try:
             sc.scrape_cars(**kwargs)
-            self._log_queue.put("__DONE__")
+            if stop_event and stop_event.is_set():
+                self._log_queue.put("__STOPPED__")
+            else:
+                self._log_queue.put("__DONE__")
         except Exception as exc:
             logging.getLogger(__name__).error("Scraper error: %s", exc, exc_info=True)
             self._log_queue.put("__ERROR__")
@@ -228,9 +246,15 @@ class ScraperApp(tk.Tk):
                 if msg == "__DONE__":
                     self._status_var.set("Done ✓")
                     self._start_btn.config(state="normal")
+                    self._stop_btn.config(state="disabled")
+                elif msg == "__STOPPED__":
+                    self._status_var.set("Stopped ◼")
+                    self._start_btn.config(state="normal")
+                    self._stop_btn.config(state="disabled")
                 elif msg == "__ERROR__":
                     self._status_var.set("Error ✗")
                     self._start_btn.config(state="normal")
+                    self._stop_btn.config(state="disabled")
                 else:
                     tag = "ERROR" if "[ERROR]" in msg else (
                           "WARNING" if "[WARNING]" in msg else (

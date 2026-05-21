@@ -343,6 +343,67 @@ class TestScrapeCars:
 
         assert metadata == []
 
+    @patch("scraper.requests.Session")
+    def test_stop_event_before_first_page(self, mock_session_cls, tmp_path):
+        """stop_event set before scraping starts → returns empty list immediately."""
+        import threading
+        self._mock_session_responses(mock_session_cls)
+        stop = threading.Event()
+        stop.set()
+
+        with patch("scraper.time.sleep"):
+            metadata = sc.scrape_cars(
+                output_dir=str(tmp_path), max_cars=5, delay=0, stop_event=stop)
+
+        assert metadata == []
+
+    @patch("scraper.requests.Session")
+    def test_stop_event_between_listings(self, mock_session_cls, tmp_path):
+        """stop_event set after first listing → only first car is scraped."""
+        import threading
+        session = MagicMock()
+        mock_session_cls.return_value = session
+
+        stop = threading.Event()
+        call_count = [0]
+
+        search_resp = _make_response(SAMPLE_SEARCH_HTML)
+        empty_resp = _make_response(EMPTY_SEARCH_HTML)
+        image_resp = _make_response(content_type="image/jpeg")
+
+        def side_effect(url, **kwargs):
+            call_count[0] += 1
+            # Set stop after first image download so second listing is skipped
+            if call_count[0] >= 2:
+                stop.set()
+            if "carsales.com.au/cars/" in url and "page=2" in url:
+                return empty_resp
+            if "carsales.com.au/cars/" in url:
+                return search_resp
+            return image_resp
+
+        session.get.side_effect = side_effect
+
+        with patch("scraper.time.sleep"):
+            metadata = sc.scrape_cars(
+                output_dir=str(tmp_path), max_cars=10, delay=0, stop_event=stop)
+
+        # At least the first car was processed before stop
+        assert len(metadata) >= 1
+        # And we did not scrape all listings (stop was respected)
+        assert len(metadata) < 10
+
+    @patch("scraper.requests.Session")
+    def test_no_stop_event_full_run(self, mock_session_cls, tmp_path):
+        """Passing stop_event=None preserves existing behaviour."""
+        self._mock_session_responses(mock_session_cls)
+
+        with patch("scraper.time.sleep"):
+            metadata = sc.scrape_cars(
+                output_dir=str(tmp_path), max_cars=2, delay=0, stop_event=None)
+
+        assert len(metadata) == 2
+
 
 # ---------------------------------------------------------------------------
 # CLI argument parser
