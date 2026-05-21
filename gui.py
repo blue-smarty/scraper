@@ -60,53 +60,60 @@ class ScraperApp(tk.Tk):
         settings = ttk.LabelFrame(self, text="Settings")
         settings.pack(fill="x", padx=10, pady=(10, 0))
 
+        # Search URL
+        ttk.Label(settings, text="Search URL:").grid(
+            row=0, column=0, sticky="w", **padding)
+        self._search_url = tk.StringVar(value=sc.SEARCH_URL)
+        ttk.Entry(settings, textvariable=self._search_url, width=36).grid(
+            row=0, column=1, columnspan=2, sticky="ew", **padding)
+
         # Output directory
         ttk.Label(settings, text="Output directory:").grid(
-            row=0, column=0, sticky="w", **padding)
+            row=1, column=0, sticky="w", **padding)
         self._output_dir = tk.StringVar(value=sc.DEFAULT_OUTPUT_DIR)
         ttk.Entry(settings, textvariable=self._output_dir, width=36).grid(
-            row=0, column=1, sticky="ew", **padding)
+            row=1, column=1, sticky="ew", **padding)
         ttk.Button(settings, text="Browse…", command=self._browse_output).grid(
-            row=0, column=2, **padding)
+            row=1, column=2, **padding)
 
         # Max cars
         ttk.Label(settings, text="Max cars:").grid(
-            row=1, column=0, sticky="w", **padding)
+            row=2, column=0, sticky="w", **padding)
         self._max_cars = tk.IntVar(value=sc.DEFAULT_MAX_CARS)
         ttk.Spinbox(settings, textvariable=self._max_cars,
                     from_=1, to=10_000, width=10).grid(
-            row=1, column=1, sticky="w", **padding)
+            row=2, column=1, sticky="w", **padding)
 
         # Delay
         ttk.Label(settings, text="Request delay (s):").grid(
-            row=2, column=0, sticky="w", **padding)
+            row=3, column=0, sticky="w", **padding)
         self._delay = tk.DoubleVar(value=sc.DEFAULT_DELAY)
         ttk.Spinbox(settings, textvariable=self._delay,
                     from_=0.0, to=30.0, increment=0.5, format="%.1f",
-                    width=10).grid(row=2, column=1, sticky="w", **padding)
+                    width=10).grid(row=3, column=1, sticky="w", **padding)
 
         # Car make
         ttk.Label(settings, text="Car make:").grid(
-            row=3, column=0, sticky="w", **padding)
+            row=4, column=0, sticky="w", **padding)
         self._make = tk.StringVar()
         ttk.Entry(settings, textvariable=self._make, width=20).grid(
-            row=3, column=1, sticky="w", **padding)
+            row=4, column=1, sticky="w", **padding)
         ttk.Label(settings, text="(e.g. Toyota, Ford — leave blank for all)",
-                  foreground="grey").grid(row=3, column=2, sticky="w", **padding)
+                  foreground="grey").grid(row=4, column=2, sticky="w", **padding)
 
         # Min price
         ttk.Label(settings, text="Min price (AUD):").grid(
-            row=4, column=0, sticky="w", **padding)
+            row=5, column=0, sticky="w", **padding)
         self._min_price = tk.StringVar()
         ttk.Entry(settings, textvariable=self._min_price, width=14).grid(
-            row=4, column=1, sticky="w", **padding)
+            row=5, column=1, sticky="w", **padding)
 
         # Max price
         ttk.Label(settings, text="Max price (AUD):").grid(
-            row=5, column=0, sticky="w", **padding)
+            row=6, column=0, sticky="w", **padding)
         self._max_price = tk.StringVar()
         ttk.Entry(settings, textvariable=self._max_price, width=14).grid(
-            row=5, column=1, sticky="w", **padding)
+            row=6, column=1, sticky="w", **padding)
 
         # Deep-scrape checkbox
         self._deep_scrape = tk.BooleanVar(value=False)
@@ -114,13 +121,13 @@ class ScraperApp(tk.Tk):
             settings,
             text="Deep-scrape (visit each listing page for full-resolution images)",
             variable=self._deep_scrape,
-        ).grid(row=6, column=0, columnspan=3, sticky="w", **padding)
+        ).grid(row=7, column=0, columnspan=3, sticky="w", **padding)
 
         # Verbose checkbox
         self._verbose = tk.BooleanVar(value=False)
         ttk.Checkbutton(
             settings, text="Verbose logging (DEBUG)", variable=self._verbose,
-        ).grid(row=7, column=0, columnspan=3, sticky="w", **padding)
+        ).grid(row=8, column=0, columnspan=3, sticky="w", **padding)
 
         settings.columnconfigure(1, weight=1)
 
@@ -178,6 +185,7 @@ class ScraperApp(tk.Tk):
 
         # Capture all parameters now (before thread starts)
         kwargs = dict(
+            search_url=self._search_url.get().strip() or None,
             output_dir=self._output_dir.get(),
             max_cars=self._max_cars.get(),
             delay=self._delay.get(),

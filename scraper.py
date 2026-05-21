@@ -75,8 +75,18 @@ def fetch_page(session: requests.Session, url: str) -> str:
 
 
 def build_search_url(page: int = 1, make: str = None,
-                     min_price: int = None, max_price: int = None) -> str:
-    """Return the carsales.com.au search URL for the given filters."""
+                     min_price: int = None, max_price: int = None,
+                     search_url: str = None) -> str:
+    """Return the search URL for the given filters.
+
+    Args:
+        page:        Page number to fetch.
+        make:        Optional car make filter.
+        min_price:   Optional minimum price filter.
+        max_price:   Optional maximum price filter.
+        search_url:  Base search URL; defaults to ``SEARCH_URL``.
+    """
+    base = search_url or SEARCH_URL
     params: dict = {"page": page}
     if make:
         params["make"] = make
@@ -84,7 +94,7 @@ def build_search_url(page: int = 1, make: str = None,
         params["price_from"] = min_price
     if max_price is not None:
         params["price_to"] = max_price
-    return f"{SEARCH_URL}?{urlencode(params)}"
+    return f"{base}?{urlencode(params)}"
 
 # ---------------------------------------------------------------------------
 # Parsing
@@ -280,9 +290,10 @@ def scrape_cars(
     min_price: int = None,
     max_price: int = None,
     deep_scrape: bool = False,
+    search_url: str = None,
 ) -> list[dict]:
     """
-    Scrape car images from carsales.com.au.
+    Scrape car images from a search results page.
 
     Args:
         output_dir:  Root directory for downloaded images and metadata files.
@@ -293,6 +304,8 @@ def scrape_cars(
         max_price:   Optional maximum price in AUD.
         deep_scrape: Visit each listing's detail page for full-resolution
                      gallery images (slower but more images per car).
+        search_url:  Base URL for search results pages.  Defaults to the
+                     carsales.com.au search URL (``SEARCH_URL``).
 
     Returns:
         List of metadata dicts, one per scraped car.
@@ -313,7 +326,8 @@ def scrape_cars(
 
     while car_count < max_cars:
         url = build_search_url(page=page, make=make,
-                               min_price=min_price, max_price=max_price)
+                               min_price=min_price, max_price=max_price,
+                               search_url=search_url)
         logger.info("Fetching search results page %d: %s", page, url)
 
         try:
