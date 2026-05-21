@@ -23,6 +23,7 @@ import argparse
 import json
 import logging
 import os
+import threading
 import time
 from pathlib import Path
 from urllib.parse import urlencode, urljoin, urlparse
@@ -291,6 +292,7 @@ def scrape_cars(
     max_price: int = None,
     deep_scrape: bool = False,
     search_url: str = None,
+    stop_event: threading.Event | None = None,
 ) -> list[dict]:
     """
     Scrape car images from a search results page.
@@ -306,6 +308,9 @@ def scrape_cars(
                      gallery images (slower but more images per car).
         search_url:  Base URL for search results pages.  Defaults to the
                      carsales.com.au search URL (``SEARCH_URL``).
+        stop_event:  Optional :class:`threading.Event`.  When set, the scraper
+                     will finish its current operation and then stop cleanly
+                     before starting the next page, listing, or image download.
 
     Returns:
         List of metadata dicts, one per scraped car.
@@ -325,6 +330,10 @@ def scrape_cars(
     )
 
     while car_count < max_cars:
+        if stop_event and stop_event.is_set():
+            logger.info("Stop requested — halting before page %d.", page)
+            break
+
         url = build_search_url(page=page, make=make,
                                min_price=min_price, max_price=max_price,
                                search_url=search_url)
@@ -347,6 +356,10 @@ def scrape_cars(
             if car_count >= max_cars:
                 break
 
+            if stop_event and stop_event.is_set():
+                logger.info("Stop requested — halting after car %d.", car_count)
+                break
+
             car_dir = output_path / f"car_{car_count:04d}"
             car_dir.mkdir(exist_ok=True)
 
@@ -358,6 +371,9 @@ def scrape_cars(
 
             downloaded: list[str] = []
             for idx, img_url in enumerate(images):
+                if stop_event and stop_event.is_set():
+                    logger.info("Stop requested — skipping remaining images for car %d.", car_count)
+                    break
                 dest = car_dir / image_filename(img_url, idx)
                 if download_image(session, img_url, dest, delay=delay):
                     downloaded.append(str(dest))
